@@ -66,7 +66,7 @@ def main():
             "text-generation",
             model=model,
             tokenizer=tokenizer,
-            dtype=torch.bfloat16,
+            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
             device_map="auto",
         )
         pm = PromptManager()
