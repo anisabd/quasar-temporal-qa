@@ -245,7 +245,7 @@ def load_finetuned_model(base_model_id: str, adapter_path: str) -> Tuple[AutoMod
         base_model_id,
         quantization_config=get_bnb_config(),
         device_map="auto",
-        dtype=torch.float16,
+        torch_dtype=torch.float16,
         trust_remote_code=True,
     )
     return PeftModel.from_pretrained(base_model, adapter_path)

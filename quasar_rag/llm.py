@@ -38,7 +38,7 @@ def load_model_and_tokenizer(model_id: str = LLM_MODEL_ID) -> Tuple[Any, Any]:
         model_id,
         quantization_config=get_bnb_config(),
         device_map="auto",
-        dtype=torch.float16,
+        torch_dtype=torch.float16,
     )
     print("Model loaded successfully!")
     print(f"Model device: {next(model.parameters()).device}")
@@ -57,7 +57,7 @@ def build_pipeline(model, tokenizer):
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16,
         device_map="auto",
     )
 
