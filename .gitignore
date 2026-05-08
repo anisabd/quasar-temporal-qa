@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Heavy artifacts (regenerated on demand)
+data/cache/
+data/*.npy
+data/*.index
+data/facts_plus.json
+data/relations.json
+data/relation_embeddings.npy
+data/nlentity2emb.json
+data/entity2emb.json
+data/triple_embeddings.npy
+data/faiss_triples.index
+
+# Outputs
+docs/figures/*.png
+qlora-results/
+*.ckpt
+submission*.csv
+
+# Notebook checkpoints
+.ipynb_checkpoints/

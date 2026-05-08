@@ -1,0 +1,26 @@
+# Core ML / NLP
+torch>=2.1
+transformers>=4.45
+accelerate>=0.34
+bitsandbytes>=0.43
+peft>=0.13
+datasets>=2.20
+huggingface_hub>=0.24
+
+# Sentence + index
+sentence-transformers>=3.0
+faiss-cpu>=1.8
+llama-index>=0.11
+llama-index-embeddings-huggingface>=0.3
+llama-index-llms-huggingface>=0.3
+
+# Data / utils
+numpy
+pandas
+scikit-learn
+nltk
+tqdm
+
+# Plotting
+matplotlib
+seaborn
