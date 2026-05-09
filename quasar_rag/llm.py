@@ -127,23 +127,24 @@ def generate_all_responses_batch(
     print(
         f"Generating responses for {len(prompts)} prompts in batches of {batch_size}"
     )
-    all_responses: List[List[str]] = []
 
-    for i in range(0, len(prompts), batch_size):
-        batch = prompts[i : i + batch_size]
-        batch_outputs = pipe(
-            batch,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            **generation_kwargs,
+    outputs = pipe(
+        prompts,
+        batch_size=batch_size,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        **generation_kwargs,
+    )
+
+    all_responses: List[List[str]] = []
+    for output in outputs:
+        messages = output[0]["generated_text"]
+        last_msg = next(
+            (m["content"] for m in reversed(messages) if m["role"] == "assistant"),
+            None,
         )
-        for output in batch_outputs:
-            messages = output[0]["generated_text"]
-            last_msg = next(
-                (m["content"] for m in reversed(messages) if m["role"] == "assistant"),
-                None,
-            )
-            all_responses.append([last_msg])
+        all_responses.append([last_msg])
+
     print(f"Generated {len(all_responses)} responses")
     return all_responses
