@@ -15,14 +15,22 @@ from transformers import (
 from .config import LLM_MODEL_ID
 
 
-def get_bnb_config() -> BitsAndBytesConfig:
-    """Default 4-bit NF4 quantization config (T4 / consumer GPU friendly)."""
+def get_bnb_config(enable_fp32_cpu_offload: bool = False) -> BitsAndBytesConfig:
+    """Default 4-bit NF4 quantization config.
+
+    Use float16 compute on GPU, float32 compute on CPU, and enable fp32 CPU offload when it is needed.
+    """
     return BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_compute_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
         bnb_4bit_use_double_quant=True,
+        llm_int8_enable_fp32_cpu_offload=enable_fp32_cpu_offload,
     )
+
+
+def get_device_map() -> object:
+    return "auto" if torch.cuda.is_available() else {"": "cpu"}
 
 
 def load_model_and_tokenizer(model_id: str = LLM_MODEL_ID) -> Tuple[Any, Any]:
@@ -34,12 +42,33 @@ def load_model_and_tokenizer(model_id: str = LLM_MODEL_ID) -> Tuple[Any, Any]:
         tokenizer.pad_token = tokenizer.eos_token
 
     print("Loading quantized model...")
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        quantization_config=get_bnb_config(),
-        device_map="auto",
-        torch_dtype=torch.float16,
-    )
+    device_map = get_device_map()
+    quantization_config = get_bnb_config(enable_fp32_cpu_offload=not torch.cuda.is_available())
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            quantization_config=quantization_config,
+            device_map=device_map,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        )
+    except ValueError as error:
+        message = str(error)
+        if (
+            "llm_int8_enable_fp32_cpu_offload" in message
+            or "Some modules are dispatched on the CPU or the disk" in message
+        ):
+            print("Quantized model load failed with automatic device placement.")
+            print("Retrying with CPU offload and a CPU device map.")
+            quantization_config = get_bnb_config(enable_fp32_cpu_offload=True)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                quantization_config=quantization_config,
+                device_map={"": "cpu"},
+                torch_dtype=torch.float32,
+            )
+        else:
+            raise
+
     print("Model loaded successfully!")
     print(f"Model device: {next(model.parameters()).device}")
     print(f"Model dtype:  {next(model.parameters()).dtype}")
@@ -57,7 +86,7 @@ def build_pipeline(model, tokenizer):
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        torch_dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         device_map="auto",
     )
 
@@ -98,23 +127,24 @@ def generate_all_responses_batch(
     print(
         f"Generating responses for {len(prompts)} prompts in batches of {batch_size}"
     )
-    all_responses: List[List[str]] = []
 
-    for i in range(0, len(prompts), batch_size):
-        batch = prompts[i : i + batch_size]
-        batch_outputs = pipe(
-            batch,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            **generation_kwargs,
+    outputs = pipe(
+        prompts,
+        batch_size=batch_size,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        **generation_kwargs,
+    )
+
+    all_responses: List[List[str]] = []
+    for output in outputs:
+        messages = output[0]["generated_text"]
+        last_msg = next(
+            (m["content"] for m in reversed(messages) if m["role"] == "assistant"),
+            None,
         )
-        for output in batch_outputs:
-            messages = output[0]["generated_text"]
-            last_msg = next(
-                (m["content"] for m in reversed(messages) if m["role"] == "assistant"),
-                None,
-            )
-            all_responses.append([last_msg])
+        all_responses.append([last_msg])
+
     print(f"Generated {len(all_responses)} responses")
     return all_responses
